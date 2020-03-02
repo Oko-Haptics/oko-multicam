@@ -35,41 +35,72 @@ def init_camera():
 # Will take photos from both cameras "simultaneously"
 def take_photos():
     start_time = time()
-    flip_to_camera('A')
+    # flip_to_camera('A')
+    # i2c_write(data=1)
+    # GPIO.output(channel_list[0], GPIO.LOW)
+    switch_cam(GPIO.LOW, 1)
     camera.capture('testing_images/foo1.jpg')
     end_time = time()
 
-    flip_to_camera('B')
+    # flip_to_camera('B')
+    # GPIO.output(channel_list[0], GPIO.HIGH)
+    # i2c_write(data=2)
+    switch_cam(GPIO.HIGH, 2)
     camera.capture('testing_images/foo2.jpg')
     print ("Took %s" % (end_time - start_time))
+
+def take_photos_stream():
+    temp_streamA = io.BytesIO()
+    temp_streamB = io.BytesIO()
+
+    start_time = time()
+    switch_cam(GPIO.LOW, 1)
+    camera.capture(temp_streamA, 'jpeg')
+
+    switch_cam(GPIO.HIGH, 2)
+    camera.capture(temp_streamB, 'jpeg')
+    end_time = time()
+    print ("Stream Took %s" % (end_time - start_time))
+    print(f'{str(temp_streamA) == str(temp_streamB)}')
+
+def switch_cam(gpio, i2c):
+    # print("I'm running")
+    sleep(0.2)
+    GPIO.output(channel_list[0], gpio)
+    i2c_write(i2c)
 
 # https://picamera.readthedocs.io/en/release-1.3/recipes2.html#rapid-capture-and-processing
 def filenames(frames):
     frame = 0
     while frame < frames:
-        if frame % 2 == 0:
-            flip_to_camera('A')
-        else:
-            flip_to_camera('B')
-        yield 'testing_images/image%02d.jpg' % frame
+        yield gimme_file(frame)
         frame += 1
+        print(f'Updating frame {frame}')
+
+def gimme_file(frame):
+    if frame % 2 == 0:
+        switch_cam(GPIO.LOW, 1)
+    else:
+        switch_cam(GPIO.HIGH, 2)
+    return 'testing_images/image%02d.jpg' % frame
 
 def take_n_photos(n):
     print('Starting to take photos')
     # Set up 40 in-memory streams
     start = time()
-    camera.capture_sequence(filenames(n), use_video_port=True)
+    camera.capture_sequence(filenames(n), use_video_port=False)
     finish = time()
     # How fast were we?
-    print('Captured 40 images at %.2ffps' % (n / (finish - start)))
+    print('Captured %d images at %.2ffps' % (n / (finish - start), n + 1))
 
 def flip_to_camera(cam):
-    print('Fliping camera')
-    sleep(1)
+    sleep(0.1)
     if cam == 'A':
+        # print(f'Writing to {GPIO.LOW} to {channel_list[0]}')
         i2c_write(data=1)
         GPIO.output(channel_list[0], GPIO.LOW)
     elif cam == 'B':
+        # print(f'Writing to {GPIO.HIGH} to {channel_list[0]}')
         i2c_write(data=2)
         GPIO.output(channel_list[0], GPIO.HIGH)
     else:
@@ -110,6 +141,7 @@ def cleanup():
 init_gpios()
 init_camera()
 # take_photos()
-take_n_photos(20)
+# take_photos_stream()
+take_n_photos(40)
 # test_i2c_writes(40)
 cleanup()

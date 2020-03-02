@@ -28,7 +28,7 @@ def init_camera():
     global camera
     camera = PiCamera()
     camera.resolution = (640, 480)
-    camera.framerate = 40
+    camera.framerate = 10
     sleep(2)
     print('Finished initing camera')
 
@@ -65,7 +65,7 @@ def take_n_photos(n):
 
 def flip_to_camera(cam):
     print('Fliping camera')
-    # sleep(0.2)
+    sleep(1)
     if cam == 'A':
         i2c_write(data=1)
         GPIO.output(channel_list[0], GPIO.LOW)
@@ -79,7 +79,7 @@ def i2c_write(data):
     successful_write = False
     retries = 1
     # Write a byte to address 70, offset 0
-    while(successful_write == False and retries < 2):
+    while(successful_write == False and retries < 3):
         with SMBus(1) as bus:
             try:
                 print('Writing to I2Cbus')

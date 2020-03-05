@@ -7,8 +7,6 @@ from smbus2 import SMBus
 import RPi.GPIO as GPIO
 
 class MultiCam:
-    i2c_addr = "0x70"
-    channel_list = [4, 17]
 
     # I want a thread that continually
     # updates the left and right photos
@@ -20,36 +18,42 @@ class MultiCam:
         self.right_photo = None
         self.left_photo = None
 
+        self.i2c_addr = "0x70"
+        self.channel_list = [4, 17]
+
         self._init_gpios()
         self._init_camera()
 
     # Get the most recently taken photo
     # from the left camera
-    def left_photo():
+    def left_photo(self):
         return self.left_photo
 
     # Get the most recently taken photo
     # from the right camera
-    def right_photo():
+    def right_photo(self):
         return self.right_photo
 
+    def take_photo(self):
+        self.camera.capture('testing_images/multicam.jpg')
+
     # https://raspberrypi.stackexchange.com/questions/22040/take-images-in-a-short-time-using-the-raspberry-pi-camera-module#22110
-    def _init_camera():
+    def _init_camera(self):
         # Want to make sure we start with Camera A
         with SMBus(1) as bus:
             # Write a byte to address 70, offset 0
             data = 1
-            bus.write_byte_data(int(i2c_addr, 16), 0, data)
+            bus.write_byte_data(int(self.i2c_addr, 16), 0, data)
 
         self.camera = PiCamera()
         self.camera.resolution = (640, 480)
         self.camera.framerate = 10
         sleep(2)
 
-    def _init_gpios():
+    def _init_gpios(self):
         # Want to use BCM numbering for the GPIOs
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(channel_list, GPIO.OUT, initial=GPIO.LOW)
+        GPIO.setup(self.channel_list, GPIO.OUT, initial=GPIO.LOW)
 
     def _write_i2c(data):
         successful_write = False
@@ -68,13 +72,14 @@ class MultiCam:
                     sleep(0.5 * retries)
                     retries += 1
 
-    def _switch_camera():
+    def _switch_camera(self):
         write_i2c(int(self.curr_camera) + 1)
-        GPIO.output(channel_list[0], not GPIO.input(channel_list[0]])
+        GPIO.output(channel_list[0], not GPIO.input(channel_list[0]))
         self.curr_camera = not self.curr_camera
         sleep(0.2)
 
-    def _use_camera(cam):
+    # Useful for using a specific camera
+    def _use_camera(self, cam):
         if cam == 'A':
             write_i2c(data=1)
             GPIO.output(channel_list[0], GPIO.LOW)
@@ -86,10 +91,9 @@ class MultiCam:
         sleep(0.1)
 
     @atexit.register
-    def _cleanup():
+    def _cleanup(self):
         self.camera.close()
         GPIO.cleanup()
-
 
 # Will take photos from both cameras "simultaneously"
 def take_photos():
@@ -155,10 +159,10 @@ def test_i2c_writes(writes):
         except IOError:
             print('Error at cycle %d' % count)
 
-init_gpios()
-init_camera()
+# init_gpios()
+# init_camera()
 # take_photos()
 # take_photos_stream()
-take_n_photos(40)
+# take_n_photos(40)
 # test_i2c_writes(40)
-cleanup()
+# cleanup()

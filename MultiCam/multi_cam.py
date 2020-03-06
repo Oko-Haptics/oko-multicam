@@ -24,6 +24,8 @@ class MultiCam:
         self._init_gpios()
         self._init_camera()
 
+        atexit.register(self._cleanup)
+
     # Get the most recently taken photo
     # from the left camera
     def left_photo(self):
@@ -36,6 +38,14 @@ class MultiCam:
 
     def take_photo(self):
         self.camera.capture('testing_images/multicam.jpg')
+
+    def take_photos(self, n):
+        print("Taking photos")
+        self.camera.capture('testing_images/multicam1.jpg')
+
+        self._write_i2c(2)
+        GPIO.output(self.channel_list[0], GPIO.HIGH)
+        self.camera.capture('testing_images/multicam2.jpg')
 
     # https://raspberrypi.stackexchange.com/questions/22040/take-images-in-a-short-time-using-the-raspberry-pi-camera-module#22110
     def _init_camera(self):
@@ -55,7 +65,7 @@ class MultiCam:
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.channel_list, GPIO.OUT, initial=GPIO.LOW)
 
-    def _write_i2c(data):
+    def _write_i2c(self, data):
         successful_write = False
         retries = 1
         # Write a byte to address 70, offset 0
@@ -63,7 +73,7 @@ class MultiCam:
             with SMBus(1) as bus:
                 try:
                     print('Writing to I2Cbus')
-                    bus.write_byte_data(int(i2c_addr, 16), 0, data)
+                    bus.write_byte_data(int(self.i2c_addr, 16), 0, data)
                     successful_write = True
                 except IOError:
                     # Want to handle Remote I/O
@@ -73,8 +83,13 @@ class MultiCam:
                     retries += 1
 
     def _switch_camera(self):
-        write_i2c(int(self.curr_camera) + 1)
-        GPIO.output(channel_list[0], not GPIO.input(channel_list[0]))
+        print("Switching camera")
+        data = int(self.curr_camera) + 1
+        print(f"Data {data}")
+        self._write_i2c(data)
+        print(f"GPIO Output / Input {GPIO.input(self.channel_list[0])}")
+        GPIO.output(self.channel_list[0], not GPIO.input(self.channel_list[0]))
+        print("Curr Camera")
         self.curr_camera = not self.curr_camera
         sleep(0.2)
 
@@ -90,7 +105,6 @@ class MultiCam:
             print("Wrong camera setting")
         sleep(0.1)
 
-    @atexit.register
     def _cleanup(self):
         self.camera.close()
         GPIO.cleanup()

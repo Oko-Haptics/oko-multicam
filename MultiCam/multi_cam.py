@@ -1,11 +1,16 @@
 import atexit
 import io
+import threading
 from time import sleep
 from time import time
 from picamera import PiCamera
 from smbus2 import SMBus
 import RPi.GPIO as GPIO
 
+# Might need a custom `write` impl here
+# But that would only be used if the caller
+# used capture_sequence(MultiCam Obj)
+# Maybe we can have a wrapper class
 class MultiCam:
 
     # I want a thread that continually
@@ -15,8 +20,8 @@ class MultiCam:
         # 'A' => False
         # 'B' => True
         self.curr_camera = False
-        self.right_photo = None
-        self.left_photo = None
+        self.right_photo = 0 # None
+        self.left_photo = 0 #None
 
         self.i2c_addr = "0x70"
         self.channel_list = [4, 17]
@@ -26,14 +31,19 @@ class MultiCam:
 
         atexit.register(self._cleanup)
 
+        # Starts background thread dedicated to taking images
+        self.processor = CaptureImages(self, self.camera)
+
     # Get the most recently taken photo
     # from the left camera
-    def left_photo(self):
+    def get_left_photo(self):
+        print(f"Get left photo {self.left_photo}")
         return self.left_photo
 
     # Get the most recently taken photo
     # from the right camera
-    def right_photo(self):
+    def get_right_photo(self):
+        print(f"Get right photo {self.right_photo}")
         return self.right_photo
 
     def take_photo(self):
@@ -108,6 +118,38 @@ class MultiCam:
     def _cleanup(self):
         self.camera.close()
         GPIO.cleanup()
+
+        self.processor.terminated = True
+        self.processor.join()
+
+class CaptureImages(threading.Thread):
+    def __init__(self, owner, camera):
+        print("Init Capture Images")
+        super(CaptureImages, self).__init__()
+
+        self.terminated = False
+        self.camera = camera
+        self.owner = owner # Owner is the MultiCam library
+
+        print(f"Init Owner Left: {self.owner.left_photo}")
+        print(f"Init Owner Right: {self.owner.right_photo}")
+
+        self.start() # Will call the run method
+
+    def run(self):
+        while not self.terminated:
+            self.owner.left_photo += 1
+            # sleep(1)
+            self.owner.right_photo += 1
+            sleep(1)
+
+            # image_L = self.camera.capture()
+            # self.owner.left = image_L
+            # MultiCam.left = image_L
+            # # Maybe have a delay here
+            # image_R = self.camera.capture()
+            # MultiCam.right = image_R
+            # self.owner.right = image_R
 
 # Will take photos from both cameras "simultaneously"
 def take_photos():
